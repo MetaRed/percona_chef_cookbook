@@ -1,0 +1,32 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+DB_BACKUP_USER='<%= @db_user %>'
+DB_BACKUP_USER_PASSWD='<%= @db_passwd %>'
+SQLDUMP_FILE="${LOCAL_BACKUP_DIR}/${DATE}_<%= node['server']['xtrabackup']['sql_dump_file'] %>"
+
+# make sure our local backup directory exists and is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+  mkdir -p $LOCAL_BACKUP_DIR
+  error_msg "Unable to create backup dir: $LOCAL_BACKUP_DIR"
+  chown mysql:root $LOCAL_BACKUP_DIR
+  error_msg "Unable to change dir permissions on $LOCAL_BACKUP_DIR"
+else
+  touch $LOCAL_BACKUP_DIR/test
+  rm $LOCAL_BACKUP_DIR/test
+  error_msg "Unable to write to backup dir: $LOCAL_BACKUP_DIR"
+fi
+
+# Run the Structure Database Backup
+mysqldump --no-data --all-databases -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD --single-transaction >$SQLDUMP_FILE
+error_msg "Unable to create MYSQL structure backup on $LOCAL_BACKUP_DIR"
+
+exit 0

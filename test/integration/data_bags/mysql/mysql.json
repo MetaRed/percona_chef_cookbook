@@ -1,0 +1,15 @@
+{
+  "id": "mysql",
+  "db_backup_user": {
+    "encrypted_data": "I+F6vukIPyWeY1uD+//jKdeCUYYnELejNZ6+0wFy6NCnlAycm6yY0Pim9Ybj\nNiq+\n",
+    "iv": "yYwWFKePx2MXjqph/a/HIQ==\n",
+    "version": 1,
+    "cipher": "aes-256-cbc"
+  },
+  "db_backup_user_passwd": {
+    "encrypted_data": "HSHS22HFFAps/zw3IM/YwJFkZCDyrZJOfDuSXBMQ/UY=\n",
+    "iv": "fV1NozM5AY9LJkE4hpIaiw==\n",
+    "version": 1,
+    "cipher": "aes-256-cbc"
+  }
+}

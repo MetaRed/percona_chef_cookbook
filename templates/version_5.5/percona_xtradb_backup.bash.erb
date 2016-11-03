@@ -1,0 +1,141 @@
+#!/bin/bash
+# set -xv
+# This is for Percona Cluster Database Migration
+# 1. It turns on db doner mode for the percona cluster node
+# 2. Runs a full backup on percona cluster doner node
+# 3. Turns off db doner mode on percona cluster node
+# 4. Copy db archive to Amazon's Simple Storage Service (AWS S3)
+#
+# Percona xtradb cluster v.5.5
+# Written By : Richard Lopez
+# Date : Nov 19th, 2014
+
+
+# Cron Path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+EMAIL=bigkahuna@meta.red
+LOCAL_BACKUP_DIR=<%= node['xtradb']['xtradb_backup']['backup_dir'] %>
+SERVER_NAME='<%= node['fqdn'] %>'
+AWS_USER='<%= node['aws_s3']['aws_user'] %>'
+S3_BUCKET='<%= node['xtradb']['xtradb_backup']['aws_db_bucket'] %>'
+DB_BACKUP_USER='<%= @db_user %>'
+DB_BACKUP_USER_PASSWD='<%= @db_passwd %>'
+LOG_DIR=<%= node['xtradb']['log_dir'] %>
+
+# email functions
+error_msg() {
+if [ ! $? -eq 0 ]; then
+  echo "$1: on $(basename $0) on ${SERVER_NAME} $(date)"\
+  |tee "mail -s $(basename $0): failed on ${SERVER_NAME} $EMAIL"
+  exit 1
+fi
+}
+
+notify_email(){
+  mail -s "${0}: failed on ${SERVER_NAME}" $EMAIL
+}
+
+s3_email() {
+  mail -s "S3 Copy FAILED after 3 attempts on ${SERVER_NAME}" $EMAIL
+}
+
+# Make sure our log directory exists
+if [ ! -d $LOG_DIR ]; then
+  mkdir $LOG_DIR
+  error_msg "Unable to create log dir $LOG_DIR"
+else
+  touch $LOG_DIR/test
+  rm $LOG_DIR/test
+  error_msg "Unable to write to log dir $LOG_DIR"
+fi
+
+# Make sure our local backup directory is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+  mkdir -p $LOCAL_BACKUP_DIR
+  error_msg "Unable to create backup dir $LOCAL_BACKUP_DIR"
+else
+  touch $LOCAL_BACKUP_DIR/test
+  rm $LOCAL_BACKUP_DIR/test
+  error_msg "Unable to write to backup dir $LOCAL_BACKUP_DIR"
+fi
+
+START_TIME="$(date)"
+echo "STARTING PERCONA NODE BACKUP ${START_TIME}"
+
+# Engage doner mode for percona cluster node
+mysql -N -s -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD -e "set global wsrep_desync=ON"
+error_msg "Unable to turn DB doner mode on"
+
+DONER_STATUS=$(mysql -N -s -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD -e "show global variables like '%wsrep_desync%'")
+echo "Turning Doner mode on: $DONER_STATUS"
+
+# Run the Database Backup
+innobackupex --rsync --parallel=20 --user=$DB_BACKUP_USER --password=$DB_BACKUP_USER_PASSWD --safe-slave-backup $LOCAL_BACKUP_DIR
+error_msg "Unable to run innobackupex on DB node"
+
+# Disengage doner mode for percona cluster node
+mysql -N -s -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD -e "set global wsrep_desync=OFF"
+error_msg "Unable to turn DB doner mode off"
+
+DONER_STATUS=$(mysql -N -s -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD -e "show global variables like '%wsrep_desync%'")
+echo "Turning Doner mode off: $DONER_STATUS"
+
+# Find the last Backup Directory for Backup
+LAST_BACKUP_DIR=$(ls -tr $LOCAL_BACKUP_DIR|tail -1)
+
+echo "APPLYING LOG TO BACKUP $(date)"
+# Apply the log on Backup Directory
+innobackupex --apply-log $LOCAL_BACKUP_DIR/$LAST_BACKUP_DIR
+error_msg "Unable to apply DB backup log"
+
+# Find the Current Backup Directory to migrate
+cd $LOCAL_BACKUP_DIR
+CURRENT_BACKUP_DIR=$(find . -maxdepth 1 -type d -daystart -mtime 0 | tail -1 | cut -d/ -f2)
+error_msg "Unable to find last backup dir under $LOCAL_BACKUP_DIR"
+
+echo "COMPRESSING BACKUP FILE $(date)"
+# Compress the current backup dir to transport
+cd $LOCAL_BACKUP_DIR
+tar --remove-files -I pigz -cvf ${SERVER_NAME}-${CURRENT_BACKUP_DIR}.tar.gz ${CURRENT_BACKUP_DIR}
+error_msg "Unable to compress today's backup ${LOCAL_BACKUP_DIR}/${SERVER_NAME}-${CURRENT_BACKUP_DIR}"
+
+# retry S3 copy up to 3 times before quitting
+# S3 Copy Start Time
+S3_START_TIME="$(date)"
+echo "STARTING PERCONA NODE S3 COPY ${S3_START_TIME}"
+cd ${LOCAL_BACKUP_DIR}
+  for i in $(find . -type f -daystart -ctime 0 -name "${SERVER_NAME}-${CURRENT_BACKUP_DIR}.tar.gz" | cut -d/ -f2); do
+    chown $AWS_USER:$AWS_USER $i
+      sudo -u $AWS_USER -i aws s3 cp ${LOCAL_BACKUP_DIR}/$i $S3_BUCKET
+       if [ ! $? -eq 0 ]; then
+         echo "Unable to copy backup file: $i to $S3_BUCKET" | tee notify_email
+         S3_RETRY_COUNT=1
+         until [ $S3_RETRY_COUNT -gt 3 ]; do
+         echo "Retrying to copy backup file: $i to $S3_BUCKET for attempt number $S3_RETRY_COUNT" \
+         |mail -s "${0}: RE-TRY number $S3_RETRY_COUNT on $SERVER_NAME" $EMAIL
+         sudo -u $AWS_USER -i aws s3 cp ${LOCAL_BACKUP_DIR}/$i $S3_BUCKET && break
+         S3_RETRY_COUNT=$[$S3_RETRY_COUNT+1]
+               if [ $S3_RETRY_COUNT -eq 4 ]; then
+                   echo "FAILED 3rd and final attempt to copy backup file: $i to $S3_BUCKET" | tee s3_email
+                   exit 1
+               fi
+         done
+     fi
+  done
+
+  # S3 Copy End Time
+  S3_END_TIME="$(date)"
+  echo "PERCONA NODE S3 COPY STARTED AT: ${S3_START_TIME} FINISHED AT: ${S3_END_TIME}"
+
+END_TIME="$(date)"
+echo "PERCONA NODE BACKUP STARTED AT: ${START_TIME} FINISHED AT ${END_TIME}"
+
+# Cleanup local backups older than today
+find ${LOCAL_BACKUP_DIR} -name "${SERVER_NAME}-${CURRENT_BACKUP_DIR}.tar.gz" -type f -daystart -mtime +0 -exec rm -f {} \;
+
+exit 0

@@ -1,0 +1,128 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables and functions
+export EMAIL='<%= node['server']['backup_email'] %>'
+export LOCAL_BACKUP_DIR=<%= node['server']['xtrabackup']['backup_dir']  %>
+export SERVER_NAME='<%= node['fqdn'] %>'
+SCRIPT_DIR=<%= node['server']['backup_script_dir'] %>
+LOG_DIR=<%= node['server']['backup_log_dir'] %>
+
+# email functions
+error_msg() {
+if [ ! $? -eq 0 ]; then
+  echo "$1: on $(basename $0) on ${SERVER_NAME} $(date)"\
+  |tee "mail -s $(basename $0): failed on ${SERVER_NAME} $EMAIL"
+  exit 1
+fi
+}
+
+# email functions
+notify_email() {
+  mail -s "${0}: failed on ${SERVER_NAME}" $EMAIL
+}
+
+s3_email() {
+  mail -s "S3 Copy FAILED after 3 attempts on ${SERVER_NAME}" $EMAIL
+}
+
+export -f error_msg
+export -f notify_email
+export -f s3_email
+
+# make sure our log directory exists
+if [ ! -d $LOG_DIR ]; then
+  mkdir -p $LOG_DIR
+  error_msg "Unable to create log dir"
+  chown mysql:root $LOG_DIR
+  error_msg "Unable to change dir permissions $LOG_DIR"
+else
+  touch $LOG_DIR/test
+  rm $LOG_DIR/test
+  error_msg "Unable to write to dir $LOG_DIR"
+fi
+
+# make sure our local backup directory is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+  mkdir -p $LOCAL_BACKUP_DIR
+  error_msg "Unable to create dir $LOCAL_BACKUP_DIR"
+  chown mysql:root $LOCAL_BACKUP_DIR
+  error_msg "Unable to change dir permissions $LOCAL_BACKUP_DIR"
+else
+  touch $LOCAL_BACKUP_DIR/test
+  rm $LOCAL_BACKUP_DIR/test
+  error_msg "Unable to write to backup dir $LOCAL_BACKUP_DIR"
+  fi
+fi
+
+# Abort backups
+if [ -e /tmp/percona_backup_aws_archive.test ]; then
+  echo "Aborting Backups to avoid filling data volume" | tee s3_email
+  exit 1
+fi
+
+## Backup Start Time
+START_TIME="$(date)"
+
+# database structure backup
+sudo -u mysql $SCRIPT_DIR/percona_structure_backup.bash
+if [ ! $? -eq 0 ]; then
+  echo "percona_structure_backup.bash exited with nonzero status" | tee notify_email
+  END_TIME="$(date)"
+  echo "MYSQL DATA BACKUP STARTED AT: ${START_TIME} FAILED AT ${END_TIME}"
+  exit 1
+fi
+
+# full database backup
+sudo -u mysql $SCRIPT_DIR/percona_backup.bash
+if [ ! $? -eq 0 ]; then
+  echo "percona_backup.bash exited with nonzero status" | tee notify_email
+  END_TIME="$(date)"
+  echo "MYSQL DATA BACKUP STARTED AT: ${START_TIME} FAILED AT ${END_TIME}"
+  exit 1
+fi
+
+# compress backups and change perms before S3 copy,removing all but the last local backup
+# exit if it fails, fast S3 copy dependent on file compression
+$SCRIPT_DIR/percona_backup_compressor.bash
+if [ ! $? -eq 0 ]; then
+  echo "percona_backup_compressor.bash exited with nonzero status" | tee notify_email
+  END_TIME="$(date)"
+  echo "MYSQL DATA BACKUP STARTED AT: ${START_TIME} FAILED AT ${END_TIME}"
+  exit 1
+fi
+
+# copy backups to s3/glacier
+# Manage test file to stop backups if S3 fails to avoid filling data volume
+touch /tmp/percona_backup_aws_archive.test
+if [ ! $? -eq 0 ]; then
+  echo "FAILED to write archive test file to /tmp dir" | tee notify_email
+  exit 1
+fi
+
+$SCRIPT_DIR/percona_backup_aws_archive.bash
+if [ ! $? -eq 0 ]; then
+  echo "percona_backup_aws_archive.bash exited with nonzero status" | tee notify_email
+  END_TIME="$(date)"
+  echo "MYSQL DATA BACKUP STARTED AT: ${START_TIME} FAILED AT ${END_TIME}"
+  exit 1
+fi
+
+rm -f /tmp/percona_backup_aws_archive.test
+error_msg "FAILED to write archive test file to /tmp dir"
+
+# clean up any full backup files older than 1 day
+find ${LOCAL_BACKUP_DIR} -name "${SERVER_NAME}*-full-backup.tar.gz" -type f -mtime +0 -exec rm -f {} \;
+error_msg "Unable to cleanup old db backup files"
+
+## Backup End Time
+END_TIME="$(date)"
+echo "MYSQL DATA BACKUP STARTED AT: ${START_TIME} FINISHED AT ${END_TIME}"
+exit 0

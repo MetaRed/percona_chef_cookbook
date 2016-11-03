@@ -1,0 +1,23 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+DATE=$(date +%Y%m%d)
+DB_BACKUP_USER='<%= @db_user %>'
+DB_BACKUP_USER_PASSWD='<%= @db_passwd %>'
+# Run the Sql
+mysql -u $DB_BACKUP_USER mysql --password=$DB_BACKUP_USER_PASSWD \
+--skip-column-names \
+-e "flush logs;"
+error_msg "Unable to flush mysql bin-logs."
+
+echo "flush complete: $DATE"
+
+exit 0

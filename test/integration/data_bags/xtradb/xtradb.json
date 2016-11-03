@@ -1,0 +1,9 @@
+{
+  "id": "xtradb",
+  "wsrep_sst_auth": {
+    "encrypted_data": "KTloY48LgmOCNk1H6OUH+J5aKvCzvW0LFsWVQM3FsuekAec9h5Gz0oKfLQiH\nhi4V\n",
+    "iv": "Z0dgY9VOmtzt8gMkEOjUiA==\n",
+    "version": 1,
+    "cipher": "aes-256-cbc"
+  }
+}

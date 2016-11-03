@@ -1,0 +1,53 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+AWS_USER='<%= node['aws_s3']['aws_user'] %>'
+EMAIL='<%= node['server']['backup_email'] %>'
+S3_BUCKET='<%= node['server']['xtrabackup']['aws_db_bucket'] %>'
+
+# make sure our local backup directory is writable
+touch $LOCAL_BACKUP_DIR/test
+rm $LOCAL_BACKUP_DIR/test
+error_msg "Unable to write to backup dir $LOCAL_BACKUP_DIR"
+if [ ! $? -eq 0 ]; then
+  echo  | tee notify_email
+  exit 1
+fi
+
+# retry S3 copy up to 3 times before quitting
+# S3 Copy Start Time
+S3_START_TIME="$(date)"
+cd ${LOCAL_BACKUP_DIR}
+for i in $(find . -type f -daystart -ctime 0 -name "${SERVER_NAME}*-full-backup.tar.gz" | cut -d/ -f2); do
+  chown $AWS_USER:$AWS_USER $i
+  sudo -u $AWS_USER -i aws s3 cp ${LOCAL_BACKUP_DIR}/$i $S3_BUCKET
+   if [ ! $? -eq 0 ]; then
+       echo "Unable to copy backup file: $i to $S3_BUCKET" | tee notify_email
+       S3_RETRY_COUNT=1
+       until [ $S3_RETRY_COUNT -gt 3 ]; do
+       echo "Retrying to copy backup file: $i to $S3_BUCKET for attempt number $S3_RETRY_COUNT" \
+       |mail -s "${0}: RE-TRY number $S3_RETRY_COUNT on $SERVER_NAME" $EMAIL
+       sudo -u $AWS_USER -i aws s3 cp ${LOCAL_BACKUP_DIR}/$i $S3_BUCKET && break
+       S3_RETRY_COUNT=$[$S3_RETRY_COUNT+1]
+             if [ $S3_RETRY_COUNT -eq 4 ]; then
+                 echo "FAILED 3rd and final attempt to copy backup file: $i to $S3_BUCKET" | tee s3_email
+                 exit 1
+             fi
+       done
+   fi
+rm $i
+done
+
+# S3 Copy End Time
+S3_END_TIME="$(date)"
+echo "MYSQL BACKUP S3 COPY STARTED AT: ${S3_START_TIME} FINISHED AT ${S3_END_TIME}"
+
+exit 0

@@ -1,0 +1,60 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+DATE=$(date +%Y%m%d)
+DB_BACKUP_USER='<%= @db_user_passwd %>'
+DB_BACKUP_USER_PASSWD='<%= @db_passwd %>'
+AWS_USER='<%= node['aws_s3']['aws_user'] %>'
+S3_BUCKET='<%= node['server']['binlog_backup']['aws_binlog_bucket'] %>'
+
+# make sure our local backup directory exists and is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+   mkdir -p $LOCAL_BACKUP_DIR
+   error_msg "Unable to create backup dir $LOCAL_BACKUP_DIR"
+   chown mysql:root $LOCAL_BACKUP_DIR
+   error_msg "Unable to change dir permissions $LOCAL_BACKUP_DIR"
+else
+   touch $LOCAL_BACKUP_DIR/test
+   rm $LOCAL_BACKUP_DIR/test
+   error_msg "Unable to write to backup dir: $LOCAL_BACKUP_DIR"
+fi
+
+# make sure our local binlog directory is writable
+touch $BINLOG_DIR/test
+rm $BINLOG_DIR/test
+error_msg "Unable to write to binlog dir: ${BINLOG_DIR}"
+
+# GET THE CURRENT BINLOG FILE USED BY MYSQL
+BINLOG_IN_USE=$(/usr/bin/mysql -N -s -u $DB_BACKUP_USER -p$DB_BACKUP_USER_PASSWD -e "SHOW MASTER STATUS" | /usr/bin/awk '{ print $1 }')
+
+# SAVE ALL BINLOG FILES CREATED IN THE LAST HOUR TO THE BACKUP FOLDER AND ARCHIVE THEM
+# DO NOT INCLUDE THE BINLOG FILE CURRENTLY USED BY MYSQL OR THE mysql-bin.index FILE
+cd ${BINLOG_DIR}
+for i in $(find . -type f ! -name ${BINLOG_IN_USE} ! -name mysql-bin.index ! -mmin +59 | cut -d/ -f2); do
+
+rsync -av --progress $i ${LOCAL_BACKUP_DIR}
+error_msg "Unable to rsync binlog $i from binlog dir: ${BINLOG_DIR} to backup dir: ${LOCAL_BACKUP_DIR}"
+
+cd ${LOCAL_BACKUP_DIR}
+TIMESTAMP=$(stat -c %y $i | awk '{ print $2 }' | cut -d. -f1 | awk -F: '{ print $1 $2 }')
+BINLOG_NUM=$(echo $i | cut -d. -f2)
+tar --remove-files -I pigz -cvf ${SERVER_NAME}-${DATE}-${TIMESTAMP}-binlog-${BINLOG_NUM}.tar.gz $i
+error_msg "Unable create binlog archive of $i on backup dir: ${LOCAL_BACKUP_DIR}"
+
+chown $AWS_USER:$AWS_USER ${SERVER_NAME}-${DATE}-${TIMESTAMP}-binlog-${BINLOG_NUM}.tar.gz
+sudo -u $AWS_USER -i aws s3 cp ${LOCAL_BACKUP_DIR}/${SERVER_NAME}-${DATE}-${TIMESTAMP}-binlog-${BINLOG_NUM}.tar.gz $S3_BUCKET
+error_msg "Unable to copy backup file: ${LOCAL_BACKUP_DIR}/${SERVER_NAME}-${DATE}-${TIMESTAMP}-binlog-${BINLOG_NUM}.tar.gz to $S3_BUCKET"
+
+cd ${BINLOG_DIR}
+
+done
+
+exit 0

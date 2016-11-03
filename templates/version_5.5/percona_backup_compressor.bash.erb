@@ -1,0 +1,35 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# make sure our local backup directory is writable
+touch $LOCAL_BACKUP_DIR/test
+rm $LOCAL_BACKUP_DIR/test
+error_msg "Unable to write to backup dir: $LOCAL_BACKUP_DIR"
+
+# find the Current Backup Directory for Backup
+cd $LOCAL_BACKUP_DIR
+CURRENT_BACKUP_DIR=$(find . -maxdepth 1 -type d -mtime 0 | tail -1 | cut -d/ -f2)
+error_msg "Unable to find last backup dir under $LOCAL_BACKUP_DIR"
+
+# tar up the current backup dir for ease of transport
+cd $LOCAL_BACKUP_DIR
+tar --remove-files -I pigz -cvf ${SERVER_NAME}-${CURRENT_BACKUP_DIR}-full-backup.tar.gz ${CURRENT_BACKUP_DIR}
+error_msg "Unable to tar up the current backup ${LOCAL_BACKUP_DIR}/${SERVER_NAME}-${CURRENT_BACKUP_DIR}"
+
+# find the current structure backup
+cd ${LOCAL_BACKUP_DIR}
+CURRENT_SQLDUMP_FILE=$(find . -maxdepth 1 -type f -name "<%= node['server']['xtrabackup']['sql_dump_file'] %>" -mtime 0 | cut -d/ -f2)
+error_msg "Unable to find the current sql dump file ${CURRENT_SQLDUMP_FILE}"
+
+# compress the current structure backup
+gzip ${CURRENT_SQLDUMP_FILE}
+error_msg "Unable to gzip the current sql dump file ${CURRENT_SQLDUMP_FILE}"
+
+exit 0

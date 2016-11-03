@@ -1,0 +1,70 @@
+[mysqld]
+
+datadir=<%= node['xtradb']['data_dir'] %>
+user=<%= node['xtradb']['db_user'] %>
+
+# Path to Galera library
+wsrep_provider=<%= node['xtradb']['wsrep_provider'] %>
+
+# Empty gcomm address is only used when cluster is getting bootstrapped
+wsrep_cluster_address=gcomm://
+
+# Cluster connection URL contains the IPs of all nodes
+#wsrep_cluster_address=
+
+# In order for Galera to work correctly binlog format should be ROW
+binlog_format=<%= node['xtradb']['binlog_format'] %>
+
+# MyISAM storage engine has only experimental support
+default_storage_engine=<%= node['xtradb']['default_storage_engine'] %>
+
+# This is a recommended tuning variable for performance
+innodb_locks_unsafe_for_binlog=<%= node['xtradb']['innodb_locks_unsafe_for_binlog'] %>
+
+# This changes how InnoDB autoincrement locks are managed and is a requirement for Galera
+innodb_autoinc_lock_mode=<%= node['xtradb']['autoinc_lock_mode'] %>
+
+# my ip
+wsrep_node_address=<%= node['ipaddress'] %>
+
+# SST method
+wsrep_sst_method=<%= node['xtradb']['wsrep_sst_method'] %>
+
+# Cluster name
+wsrep_cluster_name=<%= node['xtradb']['wsrep_cluster_name'] %>
+
+# Authentication for SST method
+wsrep_sst_auth=<%= @cluster_auth %>
+
+# CACHES AND LIMITS #
+tmp-table-size = <%= node['xtradb']['tmp_table_size'] %>
+max-heap-table-size = <%= node['xtradb']['max_heap_table_size'] %>
+query-cache-type = <%= node['xtradb']['query_cache_size'] %>
+query-cache-size = <%= node['xtradb']['query_cache_size'] %>
+max-connections = <%= node['xtradb']['max_connections'] %>
+thread-cache-size = <%= node['xtradb']['thread_cache_size'] %>
+open-files-limit = <%= node['xtradb']['open_files_limit'] %>
+table-definition-cache = <%= node['xtradb']['table_definition_cache'] %>
+table-open-cache = <%= node['xtradb']['table_open_cache'] %>
+
+# INNODB #
+innodb-flush-method = <%= node['xtradb']['innodb_flush_method'] %>
+innodb-log-files-in-group = <%= node['xtradb']['log_files_in_group'] %>
+innodb-flush-log-at-trx-commit = <%= node['xtradb']['flush_log_at_trx_commit'] %>
+innodb-file-per-table = <%= node['xtradb']['innodb_file_per_table'] %>
+innodb-buffer-pool-size = <%= node['xtradb']['buffer_pool_size'] %>
+
+# LOGGING #
+log-error = <%= node['xtradb']['log_dir'] %>/<%= node['xtradb']['error_log_file'] %>
+log-queries-not-using-indexes = <%= node['xtradb']['log_queries_not_using_indexes'] %>
+slow-query-log = <%= node['xtradb']['slow_query_log'] %>
+slow-query-log-file = <%= node['xtradb']['log_file_dir'] %>/<%= node['xtradb']['slow_query_log_file'] %>
+
+# Custom Parameters
+transaction-isolation = <%= node['xtradb']['transaction_isolation'] %>
+innodb_read_io_threads = <%= node['xtradb']['innodb_read_io_threads'] %>
+innodb_write_io_threads = <%= node['xtradb']['innodb_write_io_threads'] %>
+wsrep_slave_threads = <%= node['xtradb']['wsrep_slave_threads'] %>
+innodb_io_capacity = <%= node['xtradb']['innodb_io_capacity'] %>
+innodb_flush_neighbor_pages = <%= node['xtradb']['innodb_flush_neighbor_pages'] %>
+innodb-log-file-size = <%= node['xtradb']['innodb_log_file_size'] %>

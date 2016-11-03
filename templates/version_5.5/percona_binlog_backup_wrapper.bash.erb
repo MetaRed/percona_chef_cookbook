@@ -1,0 +1,82 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+export EMAIL='<%= node['server']['backup_email'] %>'
+export LOCAL_BACKUP_DIR='<%= node['server']['binlog_backup']['backup_dir'] %>'
+export BINLOG_DIR='<%= node['server']['bin_log_dir'] %>'
+export SERVER_NAME='<%= node['fqdn'] %>'
+SCRIPT_DIR='<%= node['server']['backup_script_dir'] %>'
+LOG_DIR='<%= node['server']['backup_log_dir'] %>'
+
+# email function
+error_msg() {
+if [ ! $? -eq 0 ]; then
+  echo "$1: on $(basename $0) on ${SERVER_NAME} $(date)"\
+  |tee "mail -s $(basename $0): failed on ${SERVER_NAME} $EMAIL"
+  exit 1
+fi
+}
+
+notify_email() {
+  mail -s "${0}: failed on ${SERVER_NAME}" $EMAIL
+}
+export -f error_msg
+export notify_email
+
+# make sure our log directory exists
+if [ ! -d $LOG_DIR ]; then
+  mkdir -p $LOG_DIR
+  error_msg "Unable to create log dir ${LOG_DIR}"
+  chown mysql:root
+  error_msg "Unable to change dir permissions ${LOG_DIR}"
+else
+  touch $LOG_DIR/test
+  rm $LOG_DIR/test
+  error_msg "Unable to write to log dir ${LOG_DIR}"
+fi
+
+# make sure our local backup directory exists and is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+   mkdir -p $LOCAL_BACKUP_DIR
+   error_msg "Unable to create backup dir: ${LOCAL_BACKUP_DIR}"
+   chown mysql:root $LOCAL_BACKUP_DIR
+   error_msg "Unable to change dir permissions ${LOCAL_BACKUP_DIR}"
+else
+   touch $LOCAL_BACKUP_DIR/test
+   rm $LOCAL_BACKUP_DIR/test
+   error_msg "Unable to write to dir ${LOCAL_BACKUP_DIR}"
+fi
+
+# make sure our local binlog directory is writable
+touch $BINLOG_DIR/test
+rm $BINLOG_DIR/test
+error_msg "Unable to write to binlog dir: ${BINLOG_DIR}"
+
+## Backup Start Time
+START_TIME="$(date)"
+
+# flush the binlog
+$SCRIPT_DIR/percona_binlog_flush.bash
+error_msg "percona_binlog_flush exited with nonzero status"
+
+# copy binlog to local backup directory
+$SCRIPT_DIR/percona_binlog_backup.bash
+error_msg "percona_binlog_backup exited with nonzero status"
+
+# cleanup binlog archives older than 15 days
+find ${LOCAL_BACKUP_DIR} -name "${SERVER_NAME}*-binlog-*.tar.gz" -mtime +15 -exec rm -f {} \;
+error_msg "Unable to cleanup old binlog files"
+
+## Backup End Time
+END_TIME="$(date)"
+echo "MYSQL BINLOG BACKUP STARTED AT: ${START_TIME} FINISHED AT ${END_TIME}"
+
+exit 0

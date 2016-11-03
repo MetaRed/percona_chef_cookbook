@@ -1,0 +1,38 @@
+#!/bin/bash
+# set -xv
+# created by Chef
+
+# cron's path
+PATH=$PATH:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# set the desired umask
+umask 002
+
+# declare variables
+DB_BACKUP_USER='<%= @db_user %>'
+DB_BACKUP_USER_PASSWD='<%= @db_passwd %>'
+
+# make sure our local backup directory exists and is writable
+if [ ! -d $LOCAL_BACKUP_DIR ]; then
+  mkdir -p $LOCAL_BACKUP_DIR
+  error_msg "Unable to create backup dir: $LOCAL_BACKUP_DIR"
+  chown mysql:root $LOCAL_BACKUP_DIR
+  error_msg "Unable to change dir permissions $LOCAL_BACKUP_DIR"
+else
+  touch $LOCAL_BACKUP_DIR/test
+  rm $LOCAL_BACKUP_DIR/test
+  error_msg "Unable to write to backup dir $LOCAL_BACKUP_DIR"
+fi
+
+# Run the database backup
+innobackupex --rsync --parallel=20 --user=$DB_BACKUP_USER --password=$DB_BACKUP_USER_PASSWD --safe-slave-backup $LOCAL_BACKUP_DIR
+error_msg "Innobackupex unable to create backup $LOCAL_BACKUP_DIR"
+
+# Find the last Backup Directory for Backup
+LAST_BACKUP_DIR=$(ls -tr $LOCAL_BACKUP_DIR|tail -1)
+
+# Apply the log to backup directory
+innobackupex --apply-log $LOCAL_BACKUP_DIR/$LAST_BACKUP_DIR
+error_msg "FAIL: Innobackupex unable to apply backup logs to $LOCAL_BACKUP_DIR/$LAST_BACKUP_DIR"
+
+exit 0

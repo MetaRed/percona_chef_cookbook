@@ -1,0 +1,15 @@
+{
+  "id": "aws_s3",
+  "aws_access_key_id": {
+    "encrypted_data": "JwiITo7lISZwRql1QmMs4DK8cTpq28OPQgn93iQ5ROMlZy9+b/6WbK8DI6dw\noJNx59D2NG7Ur440YFusFBgboQ==\n",
+    "iv": "qI+frlYYHpvOzLsoNiOTmw==\n",
+    "version": 1,
+    "cipher": "aes-256-cbc"
+  },
+  "aws_secret_access_key": {
+    "encrypted_data": "G0Aby0cslQFBYo24RtLj5xNw5mrDH6b9SBk+rwe2oYO8V9+02Jsw+sfeMj4h\nyUg0r1ndhxBEVzqu50WUPtT4yw==\n",
+    "iv": "91qsBvoLteYAsIX3B3kRMg==\n",
+    "version": 1,
+    "cipher": "aes-256-cbc"
+  }
+}

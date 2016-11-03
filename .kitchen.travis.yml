@@ -1,0 +1,23 @@
+---
+  driver:
+    name: proxy
+    host: localhost
+    reset_command: "exit 0"
+    port: <%= ENV["machine_port"] %>
+    username: <%= ENV["machine_user"] %>
+    password: <%= ENV["machine_pass"] %>
+
+  provisioner:
+    name: chef_zero
+    data_path: test/integration/serverspec_help
+    encrypted_data_bag_secret_key_path: test/integration/keys/crypt_keyper
+
+  platforms:
+    - name: ubuntu-14.04
+
+  suites:
+    - name: percona_server
+      run_list:
+        - recipe[percona::server]
+        - recipe[percona::xtrabackup]
+        - recipe[percona::binlog_backup]
