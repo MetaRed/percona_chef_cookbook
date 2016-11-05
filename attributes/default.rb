@@ -70,5 +70,5 @@ default['xtradb'].tap do |xtradb|
 end
 
 default['aws_s3'].tap do |aws_s3|
-  aws_s3['aws_user'] = 'travis'
+  aws_s3['aws_user'] = 'kitchen'
 end
