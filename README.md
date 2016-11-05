@@ -1,7 +1,7 @@
 Percona Database Cookbook
 =========================
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Cookbook: version](https://img.shields.io/badge/Cookbook-v0.0.1-blue.svg)](https://github.com/MetaRed/percona_chef_cookbook/releases/tag/v0.0.2)
+[![Cookbook: version](https://img.shields.io/badge/Cookbook-v0.0.2-blue.svg)](https://github.com/MetaRed/percona_chef_cookbook/releases/tag/v0.0.2)
 [![Build Status](https://travis-ci.org/MetaRed/percona_chef_cookbook.svg?branch=master)](https://travis-ci.org/MetaRed/percona_chef_cookbook)
 [![Coverage Status](https://coveralls.io/repos/github/MetaRed/percona_chef_cookbook/badge.svg?branch=master)](https://coveralls.io/github/MetaRed/percona_chef_cookbook?branch=master)
 
