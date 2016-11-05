@@ -1,25 +1,21 @@
 language: ruby
-
-env:
-  global:
-    - machine_user=travis
-    - machine_pass=travis
-    - machine_port=22
-    - KITCHEN_YAML=.kitchen.travis.yml
+sudo: required
+services: docker
 
 rvm:
   - 2.3.0
 
-sudo: required
-dist: trusty
+env:
+  global:
+    - KITCHEN_YAML=.kitchen.docker.yml
 
-before_install:
-  - sudo usermod -p "`openssl passwd -1 'travis'`" travis
-  - sudo apt-get update
+  matrix:
+    - TEST_SUITE=percona-server-ubuntu-1404
+    - TEST_SUITE=percona-xtradb-ubuntu-1404
 
 script:
   - bundle exec rspec
-  - bundle exec kitchen verify
+  - bundle exec kitchen verify ${TEST_SUITE}
 
 
 branches:

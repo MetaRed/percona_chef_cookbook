@@ -62,8 +62,6 @@ apt_packages.each do |p|
   end
 end
 
-
-
 dir_list = [
   node['xtradb']['data_dir'],
   node['xtradb']['log_dir']
@@ -92,13 +90,6 @@ template '/etc/mysql/my.cnf' do
   variables(
     cluster_auth: auth['wsrep_sst_auth']
   )
-end
-
-# stop mysql_safe run of default installation
-execute 'stop_mysql_default_installation' do
-  command '/usr/bin/mysqladmin shutdown'
-  user 'root'
-  action :run
 end
 
 # setup mysql database schema

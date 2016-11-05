@@ -58,10 +58,6 @@ describe 'Percona XTRADB Cluster 5.5 config parameters' do
     its(:value) { should eq 100 }
   end
 
-  context mysql_config('open-files-limit') do
-    its(:value) { should eq 65_535 }
-  end
-
   context mysql_config('table-definition-cache') do
     its(:value) { should eq 4096 }
   end

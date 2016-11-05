@@ -88,13 +88,6 @@ template '/etc/mysql/my.cnf' do
   only_if { File.exist?('/etc/mysql') }
 end
 
-# Stop mysql_safe run of default installation
-execute 'stop_mysql_default_installation' do
-  command '/usr/bin/mysqladmin shutdown'
-  user 'root'
-  action :run
-end
-
 # install database schema
 execute 'install_mysql_db_schema' do
   command 'mysql_install_db --defaults-file=/etc/mysql/my.cnf'

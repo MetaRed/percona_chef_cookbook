@@ -1,0 +1,30 @@
+---
+driver:
+  name: docker
+  disable_upstart: false
+
+provisioner:
+  name: chef_zero
+  data_path: test/integration/serverspec_help
+  data_bags_path: test/integration/data_bags
+  encrypted_data_bag_secret_key_path: test/integration/keys/crypt_keyper
+
+platforms:
+  - name: ubuntu-14.04
+    driver_config:
+      image: ubuntu:14.04
+      platform: ubuntu
+
+
+suites:
+  - name: percona_server
+    run_list:
+      - recipe[percona::server]
+      - recipe[percona::xtrabackup]
+      - recipe[percona::binlog_backup]
+
+
+  - name: percona_xtradb
+    run_list:
+      - recipe[percona::xtradb]
+      - recipe[percona::xtradb_backup]

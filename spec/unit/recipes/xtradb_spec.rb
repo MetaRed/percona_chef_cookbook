@@ -78,10 +78,6 @@ describe 'percona::xtradb' do
       expect(chef_run).to_not run_execute('update_apt')
     end
 
-    it 'stop default running percona installation' do
-      expect(chef_run).to run_execute('stop_mysql_default_installation')
-    end
-
     it 'install db schema on custom dir' do
       expect(chef_run).to run_execute('install_mysql_db_schema')
     end
