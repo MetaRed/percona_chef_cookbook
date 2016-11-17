@@ -1,5 +1,6 @@
 language: ruby
-sudo: required
+cache: bundler
+sudo: false
 services: docker
 
 rvm:
@@ -12,6 +13,9 @@ env:
   matrix:
     - TEST_SUITE=percona-server-ubuntu-1404
     - TEST_SUITE=percona-xtradb-ubuntu-1404
+
+before_install:
+  - test/travis_ci/lvm_setup.bash 2>&1
 
 script:
   - bundle exec rspec

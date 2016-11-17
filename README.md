@@ -1,7 +1,7 @@
 Percona Database Cookbook
 =========================
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Cookbook: version](https://img.shields.io/badge/Cookbook-v0.0.2-blue.svg)](https://github.com/MetaRed/percona_chef_cookbook/releases/tag/v0.0.2)
+[![Cookbook: version](https://img.shields.io/badge/Cookbook-v0.0.3-blue.svg)](https://github.com/MetaRed/percona_chef_cookbook/releases/tag/v0.0.3)
 [![Build Status](https://travis-ci.org/MetaRed/percona_chef_cookbook.svg?branch=master)](https://travis-ci.org/MetaRed/percona_chef_cookbook)
 [![Coverage Status](https://coveralls.io/repos/github/MetaRed/percona_chef_cookbook/badge.svg?branch=master)](https://coveralls.io/github/MetaRed/percona_chef_cookbook?branch=master)
 
@@ -500,14 +500,21 @@ test/integration/percona_server
 test/integration/percona_xtradb
 ```
 
+`Travis-CI`: Call LVM volume script from travis.yml
+```yaml
+before_install:
+  - test/travis_ci/lvm_setup.bash 2>&1
+```
+
+
 Authors
 -------
 Authors: Richard Lopez
 
 TODO:
 -----
+- :white_check_mark: Dynamic LVM2 deployment
+- :white_check_mark: File system block level alignment
 - [ ] Upgrade legacy scripts
-- [ ] Dynamic LVM2 deployment
-- [ ] File system block level alignment
 - [ ] Backup ingestion
 - [ ] my.cnf templates for < v5.6 support
